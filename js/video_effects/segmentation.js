@@ -1,58 +1,45 @@
-// segmentation.js - Person Segmentation using MediaPipe
+// segmentation.js - Person Segmentation using TensorFlow.js BodyPix
 
 export class SegmentationManager {
     constructor() {
-        this.selfieSegmentation = null;
+        this.bodyPixModel = null;
         this.segmentationMask = null;
         this.enabled = true;
-        this.resolution = 256; // Default resolution
-        this.frameSkip = 2; // Process every Nth frame for performance
+        this.resolution = 256;
+        this.frameSkip = 2;
         this.frameCount = 0;
         this.isProcessing = false;
+        this.isInitialized = false;
     }
 
     /**
-     * Initialize MediaPipe Selfie Segmentation
-     */
-    /**
-     * Initialize MediaPipe Selfie Segmentation
+     * Initialize TensorFlow.js BodyPix
      */
     async init(videoElement, resolution = 256) {
         this.resolution = resolution;
 
-        // Use global SelfieSegmentation loaded via script tag in index.html
-        if (!window.SelfieSegmentation) {
-            console.error('MediaPipe SelfieSegmentation not loaded');
-            return;
-        }
-
-        this.selfieSegmentation = new window.SelfieSegmentation({
-            locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+        try {
+            // Load BodyPix from CDN
+            if (!window.bodyPix) {
+                console.error('BodyPix not loaded. Make sure to include the script tag.');
+                return;
             }
-        });
 
-        // Configure for performance
-        this.selfieSegmentation.setOptions({
-            modelSelection: 0, // 0 = general (faster), 1 = landscape (more accurate)
-            selfieMode: true
-        });
+            console.log('Loading BodyPix model...');
 
-        // Set up results callback
-        this.selfieSegmentation.onResults((results) => {
-            this.onResults(results);
-        });
+            // Load model with performance settings
+            this.bodyPixModel = await window.bodyPix.load({
+                architecture: 'MobileNetV1',
+                outputStride: 16,
+                multiplier: 0.75,
+                quantBytes: 2
+            });
 
-        console.log(`Segmentation initialized at ${resolution}x${resolution}`);
-    }
-
-    /**
-     * Process segmentation results
-     */
-    onResults(results) {
-        if (results.segmentationMask) {
-            this.segmentationMask = results.segmentationMask;
-            this.isProcessing = false;
+            this.isInitialized = true;
+            console.log(`BodyPix initialized at ${resolution}x${resolution}`);
+        } catch (error) {
+            console.error('BodyPix initialization failed:', error);
+            this.isInitialized = false;
         }
     }
 
@@ -60,7 +47,7 @@ export class SegmentationManager {
      * Process video frame for segmentation
      */
     async processFrame(videoElement) {
-        if (!this.enabled || !this.selfieSegmentation) {
+        if (!this.enabled || !this.isInitialized || !this.bodyPixModel) {
             return;
         }
 
@@ -78,8 +65,15 @@ export class SegmentationManager {
         this.isProcessing = true;
 
         try {
-            // Send to MediaPipe at lower resolution
-            await this.selfieSegmentation.send({ image: videoElement });
+            // Segment person from background
+            const segmentation = await this.bodyPixModel.segmentPerson(videoElement, {
+                flipHorizontal: false,
+                internalResolution: 'medium',
+                segmentationThreshold: 0.7
+            });
+
+            this.segmentationMask = segmentation;
+            this.isProcessing = false;
         } catch (error) {
             console.error('Segmentation error:', error);
             this.isProcessing = false;
@@ -97,7 +91,7 @@ export class SegmentationManager {
      * Apply person mask to a canvas
      */
     applyMask(sourceCanvas, destCanvas) {
-        if (!this.segmentationMask) {
+        if (!this.segmentationMask || !this.segmentationMask.data) {
             // No mask yet, just copy canvas
             const ctx = destCanvas.getContext('2d');
             ctx.drawImage(sourceCanvas, 0, 0);
@@ -115,13 +109,10 @@ export class SegmentationManager {
         const imageData = ctx.getImageData(0, 0, width, height);
         const data = imageData.data;
 
-        // Create temporary canvas for mask
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = this.segmentationMask.width;
-        maskCanvas.height = this.segmentationMask.height;
-        const maskCtx = maskCanvas.getContext('2d');
-        maskCtx.drawImage(this.segmentationMask, 0, 0);
-        const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+        // Get mask data
+        const maskData = this.segmentationMask.data;
+        const maskWidth = this.segmentationMask.width;
+        const maskHeight = this.segmentationMask.height;
 
         // Apply mask (make background transparent)
         for (let y = 0; y < height; y++) {
@@ -129,13 +120,13 @@ export class SegmentationManager {
                 const i = (y * width + x) * 4;
 
                 // Sample mask (scale coordinates)
-                const maskX = Math.floor(x * maskCanvas.width / width);
-                const maskY = Math.floor(y * maskCanvas.height / height);
-                const maskI = (maskY * maskCanvas.width + maskX) * 4;
+                const maskX = Math.floor(x * maskWidth / width);
+                const maskY = Math.floor(y * maskHeight / height);
+                const maskI = maskY * maskWidth + maskX;
 
-                // Use mask value for alpha (0 = background, 255 = person)
+                // Use mask value for alpha (0 = background, 1 = person)
                 const maskValue = maskData[maskI];
-                data[i + 3] = maskValue; // Set alpha channel
+                data[i + 3] = maskValue === 1 ? 255 : 0; // Set alpha channel
             }
         }
 
@@ -181,8 +172,8 @@ export class SegmentationManager {
      * Clean up
      */
     dispose() {
-        if (this.selfieSegmentation) {
-            this.selfieSegmentation.close();
+        if (this.bodyPixModel) {
+            this.bodyPixModel.dispose();
         }
     }
 }

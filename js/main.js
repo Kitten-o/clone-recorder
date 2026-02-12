@@ -195,11 +195,6 @@ class CloneRecorderApp {
      * Spawn clones
      */
     spawnClones() {
-        if (this.cloneManager.hasActiveClones()) {
-            console.log('Clones already active');
-            return;
-        }
-
         const centerX = this.elements.canvas.width / 2;
         const centerY = this.elements.canvas.height / 2;
 
