@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Create cinematic clone effects during live recording using hand gestures">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Clone Recorder - Gesture-Controlled Clone Effects</title>
+
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <!-- Main Container -->
+    <div id="app" class="app-container">
+
+        <!-- Header -->
+        <header class="app-header">
+            <button id="helpBtn" class="icon-btn" aria-label="Help">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <circle cx="12" cy="17" r="0.5" fill="currentColor" />
+                </svg>
+            </button>
+
+            <h1 class="app-title">Clone Recorder</h1>
+
+            <button id="settingsBtn" class="icon-btn" aria-label="Settings">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M12 1v6m0 6v6m5.196-13.196l-4.242 4.242m0 6l-4.242 4.242M23 12h-6m-6 0H1m18.196 5.196l-4.242-4.242m-6 0l-4.242-4.242" />
+                </svg>
+            </button>
+        </header>
+
+        <!-- Main Viewport -->
+        <main class="viewport-container">
+            <canvas id="mainCanvas" class="main-canvas"></canvas>
+            <video id="videoPreview" autoplay playsinline muted style="display: none;"></video>
+
+            <!-- Gesture Detection Feedback -->
+            <div id="gestureOverlay" class="gesture-overlay hidden">
+                <div class="hand-outline"></div>
+                <p class="gesture-label"></p>
+            </div>
+
+            <!-- Performance Indicator -->
+            <div id="fpsCounter" class="fps-counter hidden">
+                <span id="fpsValue">-- FPS</span>
+            </div>
+
+            <!-- Recording Indicator -->
+            <div id="recordingIndicator" class="recording-indicator hidden">
+                <div class="rec-dot"></div>
+                <span>REC</span>
+                <span id="recordingTime">00:00</span>
+            </div>
+
+            <!-- Countdown Overlay -->
+            <div id="countdownOverlay" class="countdown-overlay hidden">
+                <span id="countdownNumber">3</span>
+            </div>
+        </main>
+
+        <!-- Bottom Control Bar -->
+        <footer class="control-bar">
+            <!-- Gesture Guide -->
+            <div class="gesture-guide">
+                <div class="gesture-item">
+                    <span class="gesture-emoji">✌️</span>
+                    <span class="gesture-text">Spawn</span>
+                </div>
+                <div class="gesture-item">
+                    <span class="gesture-emoji">✊</span>
+                    <span class="gesture-text">Dismiss</span>
+                </div>
+                <div id="cloneCount" class="clone-info">
+                    <span>Clones: <strong>0</strong></span>
+                </div>
+            </div>
+
+            <!-- Recording Controls -->
+            <div class="recording-controls">
+                <button id="recordBtn" class="control-btn record-btn" disabled>
+                    <svg class="btn-icon" width="24" height="24" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="8" fill="currentColor" />
+                    </svg>
+                    <span>Record</span>
+                </button>
+
+                <button id="stopBtn" class="control-btn stop-btn hidden" disabled>
+                    <svg class="btn-icon" width="24" height="24" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" fill="currentColor" />
+                    </svg>
+                    <span>Stop</span>
+                </button>
+
+                <button id="downloadBtn" class="control-btn download-btn hidden">
+                    <svg class="btn-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Download</span>
+                </button>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>How to Use Clone Recorder</h2>
+                <button class="close-btn" data-modal="helpModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>🎬 Getting Started</h3>
+                    <ol>
+                        <li>Allow camera access when prompted</li>
+                        <li>Use hand gestures to spawn/dismiss clones</li>
+                        <li>Click Record to start capturing</li>
+                        <li>Perform your movements with clones</li>
+                        <li>Click Stop and download your video</li>
+                    </ol>
+                </div>
+
+                <div class="help-section">
+                    <h3>👋 Gestures</h3>
+                    <div class="gesture-help">
+                        <div>
+                            <strong>✌️ Peace Sign</strong>
+                            <p>Hold for 0.5s to spawn clones</p>
+                        </div>
+                        <div>
+                            <strong>✊ Closed Fist</strong>
+                            <p>Hold for 0.5s to dismiss all clones</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>💡 Tips</h3>
+                    <ul>
+                        <li>Keep your hand visible and well-lit</li>
+                        <li>Hold gestures steady for recognition</li>
+                        <li>Number of clones adapts to device performance</li>
+                        <li>All processing happens locally - no data upload</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="close-btn" data-modal="settingsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label for="cloneCountOverride">Clone Count (0 = Auto)</label>
+                    <input type="range" id="cloneCountOverride" min="0" max="10" value="0" step="1">
+                    <span id="cloneCountValue">Auto</span>
+                </div>
+
+                <div class="setting-item">
+                    <label for="gestureSensitivity">Gesture Sensitivity</label>
+                    <input type="range" id="gestureSensitivity" min="0.5" max="1.0" value="0.8" step="0.1">
+                    <span id="sensitivityValue">0.8</span>
+                </div>
+
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="showFPS">
+                        Show FPS Counter
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enableAudio">
+                        Enable Audio Recording
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <label for="videoQuality">Video Quality</label>
+                    <select id="videoQuality">
+                        <option value="720">720p (Recommended)</option>
+                        <option value="1080">1080p (High Quality)</option>
+                        <option value="480">480p (Performance Mode)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loadingMessage">Initializing camera...</p>
+    </div>
+
+    <!-- MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js"
+        crossorigin="anonymous"></script>
+
+    <!-- MediaPipe Selfie Segmentation for background removal -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js"
+        crossorigin="anonymous"></script>
+
+    <!-- Application Modules -->
+    <script type="module" src="js/performance-manager.js"></script>
+    <script type="module" src="js/video_effects/segmentation.js"></script>
+    <script type="module" src="js/video_effects/particle-system.js"></script>
+    <script type="module" src="js/camera.js"></script>
+    <script type="module" src="js/gesture-detector.js"></script>
+    <script type="module" src="js/clone-manager.js"></script>
+    <script type="module" src="js/video_effects/effect-renderer.js"></script>
+    <script type="module" src="js/recorder.js"></script>
+    <script type="module" src="js/main.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
