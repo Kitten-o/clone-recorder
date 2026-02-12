@@ -14,13 +14,19 @@ export class SegmentationManager {
     /**
      * Initialize MediaPipe Selfie Segmentation
      */
+    /**
+     * Initialize MediaPipe Selfie Segmentation
+     */
     async init(videoElement, resolution = 256) {
         this.resolution = resolution;
 
-        // Import MediaPipe Selfie Segmentation
-        const { SelfieSegmentation } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js');
+        // Use global SelfieSegmentation loaded via script tag in index.html
+        if (!window.SelfieSegmentation) {
+            console.error('MediaPipe SelfieSegmentation not loaded');
+            return;
+        }
 
-        this.selfieSegmentation = new SelfieSegmentation({
+        this.selfieSegmentation = new window.SelfieSegmentation({
             locateFile: (file) => {
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
             }
