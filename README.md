@@ -24,7 +24,7 @@ The app detects your device's capabilities on startup:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/clone-recorder.git
+   git clone https://github.com/Kitten-o/clone-recorder.git
    ```
 
 2. Serve the directory using any static file server.
