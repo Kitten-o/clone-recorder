@@ -9,27 +9,32 @@ export class ParticleSystem {
     /**
      * Emit smoke particles at a position
      */
-    emit(x, y, count = 10, type = 'spawn') {
+    emit(x, y, count = 30, type = 'spawn') {
+        // Increase particle count for "puff" effect
         for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 4 + 1;
+
             const particle = {
                 x,
-                y,
-                vx: (Math.random() - 0.5) * 2,
-                vy: (Math.random() - 0.5) * 2 - 1, // Upward bias
-                size: Math.random() * 30 + 20,
-                opacity: 1,
-                life: 1,
-                maxLife: Math.random() * 0.8 + 0.5,
-                color: type === 'spawn' ? 'rgba(255,255,255' : 'rgba(200,200,200',
-                delay: i * 20 // Staggered emission
+                y: type === 'spawn' ? y + 100 : y - 100, // Start from bottom for spawn, top for dismiss
+                vx: Math.cos(angle) * speed,
+                vy: type === 'spawn' ? -Math.random() * 5 - 2 : Math.random() * 5 + 2, // Upward for spawn, downward for dismiss
+                size: Math.random() * 40 + 40,
+                opacity: 0.8,
+                life: 1.0,
+                maxLife: Math.random() * 0.5 + 0.5,
+                color: 'rgba(255,255,255',
+                delay: Math.random() * 200,
+                type: type
             };
 
             this.particles.push(particle);
         }
 
         // Limit particle count
-        if (this.particles.length > this.maxParticles) {
-            this.particles = this.particles.slice(-this.maxParticles);
+        if (this.particles.length > 200) {
+            this.particles = this.particles.slice(-200);
         }
     }
 
@@ -50,17 +55,23 @@ export class ParticleSystem {
             p.x += p.vx;
             p.y += p.vy;
 
-            // Update velocity (slow down and drift up)
-            p.vx *= 0.98;
-            p.vy *= 0.98;
-            p.vy -= 0.02; // Gravity upward
+            // Update velocity (friction)
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+
+            // Rising/falling bias
+            if (p.type === 'spawn') {
+                p.vy -= 0.1;
+            } else {
+                p.vy += 0.1;
+            }
 
             // Update life and opacity
             p.life -= dt / p.maxLife;
             p.opacity = Math.max(0, p.life);
 
-            // Expand size
-            p.size += 0.5;
+            // Expand size for "billowing" effect
+            p.size += 2.0;
 
             // Remove dead particles
             return p.life > 0;

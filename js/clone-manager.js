@@ -49,12 +49,12 @@ export class CloneManager {
                 id: i,
                 x: positions[i].x,
                 y: positions[i].y,
-                delay: this.cloneDelay + i, // Slightly different delay for variety
+                delay: this.cloneDelay + (i * 2), // Per-clone delay variation (PRD 4.3)
                 opacity: 1,
                 scale: 1,
                 animationState: 'spawning',
                 animationProgress: 0,
-                spawnDelay: i * 300 // Staggered timing (300ms apart)
+                spawnDelay: i * 150 // Staggered timing (150ms apart - PRD 5.1)
             });
         }
 
@@ -136,10 +136,12 @@ export class CloneManager {
      */
     dismissClones() {
         // Set animation state to dismissing
+        // Staggered dismiss (reverse order - last spawned dismissed first - PRD 5.3)
+        const count = this.clones.length;
         this.clones.forEach((clone, index) => {
             clone.animationState = 'dismissing';
             clone.animationProgress = 0;
-            clone.spawnDelay = index * 300; // Staggered dismiss
+            clone.spawnDelay = (count - 1 - index) * 150;
         });
 
         // Store positions for particle effects
@@ -164,7 +166,8 @@ export class CloneManager {
                 }
 
                 // Update progress
-                const duration = clone.animationState === 'spawning' ? 1000 : 800;
+                // Spawning: 1200ms (PRD 5.1), Dismissing: 800ms (PRD 5.3)
+                const duration = clone.animationState === 'spawning' ? 1200 : 800;
                 clone.animationProgress += deltaTime / duration;
 
                 if (clone.animationProgress >= 1) {
@@ -269,5 +272,12 @@ export class CloneManager {
      */
     getParticlePositions() {
         return this.particlePositions;
+    }
+
+    /**
+     * Clear particle positions after they've been emitted
+     */
+    clearParticlePositions() {
+        this.particlePositions = [];
     }
 }

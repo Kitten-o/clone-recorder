@@ -4,6 +4,7 @@ export class SegmentationManager {
     constructor() {
         this.bodyPixModel = null;
         this.segmentationMask = null;
+        this.maskCanvas = document.createElement('canvas');
         this.enabled = true;
         this.resolution = 256;
         this.frameSkip = 2;
@@ -88,50 +89,50 @@ export class SegmentationManager {
     }
 
     /**
-     * Apply person mask to a canvas
+     * Apply person mask to a canvas using globalCompositeOperation (optimized)
      */
     applyMask(sourceCanvas, destCanvas) {
-        if (!this.segmentationMask || !this.segmentationMask.data) {
-            // No mask yet, just copy canvas
-            const ctx = destCanvas.getContext('2d');
-            ctx.drawImage(sourceCanvas, 0, 0);
-            return;
-        }
-
         const ctx = destCanvas.getContext('2d');
         const width = destCanvas.width;
         const height = destCanvas.height;
 
-        // Draw source
-        ctx.drawImage(sourceCanvas, 0, 0, width, height);
+        if (!this.segmentationMask || !this.segmentationMask.data) {
+            // No mask yet, just copy canvas
+            ctx.drawImage(sourceCanvas, 0, 0, width, height);
+            return;
+        }
 
-        // Get image data
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
-
-        // Get mask data
-        const maskData = this.segmentationMask.data;
+        // 1. Prepare mask canvas
         const maskWidth = this.segmentationMask.width;
         const maskHeight = this.segmentationMask.height;
 
-        // Apply mask (make background transparent)
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const i = (y * width + x) * 4;
-
-                // Sample mask (scale coordinates)
-                const maskX = Math.floor(x * maskWidth / width);
-                const maskY = Math.floor(y * maskHeight / height);
-                const maskI = maskY * maskWidth + maskX;
-
-                // Use mask value for alpha (0 = background, 1 = person)
-                const maskValue = maskData[maskI];
-                data[i + 3] = maskValue === 1 ? 255 : 0; // Set alpha channel
-            }
+        if (this.maskCanvas.width !== maskWidth || this.maskCanvas.height !== maskHeight) {
+            this.maskCanvas.width = maskWidth;
+            this.maskCanvas.height = maskHeight;
         }
 
-        // Put modified data back
-        ctx.putImageData(imageData, 0, 0);
+        const maskCtx = this.maskCanvas.getContext('2d');
+        const maskImageData = maskCtx.createImageData(maskWidth, maskHeight);
+        const maskData = this.segmentationMask.data;
+
+        // Fill alpha channel of mask canvas
+        for (let i = 0; i < maskData.length; i++) {
+            const val = maskData[i] === 1 ? 255 : 0;
+            const j = i * 4;
+            // Red, Green, Blue don't matter for destination-in alpha mask
+            maskImageData.data[j+3] = val;
+        }
+        maskCtx.putImageData(maskImageData, 0, 0);
+
+        // 2. Draw source and apply mask
+        ctx.save();
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(sourceCanvas, 0, 0, width, height);
+
+        // Use globalCompositeOperation to mask the already drawn source
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(this.maskCanvas, 0, 0, width, height);
+        ctx.restore();
     }
 
     /**
