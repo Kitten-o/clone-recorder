@@ -30,7 +30,7 @@ export class GestureDetector {
             });
 
             this.hands.setOptions({
-                maxNumHands: 1,
+                maxNumHands: 2,
                 modelComplexity: 1,
                 minDetectionConfidence: 0.7,
                 minTrackingConfidence: 0.7
@@ -76,38 +76,88 @@ export class GestureDetector {
             return;
         }
 
-        const landmarks = results.multiHandLandmarks[0];
-        const handedness = results.multiHandedness[0];
-
-        // Detect gesture type
-        const gestureType = this.detectGesture(landmarks, handedness);
-
-        if (gestureType) {
-            this.handleGestureTracking(gestureType);
-        } else {
-            this.currentGestureStart = null;
-            this.currentGestureType = null;
+        // Check for Shadow Clone Hand Seal (requires 2 hands potentially)
+        const isSeal = this.detectShadowCloneSeal(results.multiHandLandmarks);
+        if (isSeal) {
+            this.handleGestureTracking('spawn');
+            return;
         }
+
+        // Check for Dismiss gesture (open palm on any hand)
+        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+            if (this.detectOpenPalm(results.multiHandLandmarks[i])) {
+                this.handleGestureTracking('dismiss');
+                return;
+            }
+        }
+
+        this.currentGestureStart = null;
+        this.currentGestureType = null;
     }
 
     /**
-     * Detect gesture from hand landmarks
-     * @returns {string|null} - 'spawn', 'dismiss', or null
+     * Detect Shadow Clone Hand Seal (Crossed fingers)
      */
-    detectGesture(landmarks, handedness) {
+    detectShadowCloneSeal(multiLandmarks) {
+        // According to PRD, we look for crossed index and middle fingers.
+        // If we have two hands, we check if they are close together and forming a cross.
+        // For simplicity and based on the PRD snippet, we check if any hand is forming the seal.
+
+        for (const landmarks of multiLandmarks) {
+            const indexTip = landmarks[8];
+            const middleTip = landmarks[12];
+            const indexBase = landmarks[5];
+            const middleBase = landmarks[9];
+
+            const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+
+            // Hand scale
+            const handScale = dist(landmarks[0], landmarks[9]);
+
+            // Fingers must be extended
+            const indexExtended = dist(indexTip, indexBase) > handScale * 0.8;
+            const middleExtended = dist(middleTip, middleBase) > handScale * 0.8;
+
+            // Fingers must cross (tips closer than bases)
+            const tipDistance = dist(indexTip, middleTip);
+            const baseDistance = dist(indexBase, middleBase);
+            const isCrossed = tipDistance < baseDistance * 0.5;
+
+            if (indexExtended && middleExtended && isCrossed) {
+                return true;
+            }
+        }
+
+        // Also check interaction between two hands if present
+        if (multiLandmarks.length === 2) {
+            const h1 = multiLandmarks[0];
+            const h2 = multiLandmarks[1];
+
+            const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+
+            // Check if hands are overlapping/crossing
+            const center1 = h1[9]; // Middle MCP
+            const center2 = h2[9];
+
+            if (dist(center1, center2) < 0.1) { // Close together
+                // Simplified: if both have index/middle up and are close, it's likely a seal
+                const f1 = this.getFingerStates(h1);
+                const f2 = this.getFingerStates(h2);
+                if (f1.index && f1.middle && f2.index && f2.middle) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect Open Palm for dismissal
+     */
+    detectOpenPalm(landmarks) {
         const fingers = this.getFingerStates(landmarks);
-
-        // Peace sign (✌️) - Index and middle up, others down
-        if (fingers.index && fingers.middle && !fingers.ring && !fingers.pinky) {
-            return 'spawn';
-        }
-
-        // Closed fist (✊) - All fingers down
-        if (!fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky) {
-            return 'dismiss';
-        }
-
-        return null;
+        return fingers.thumb && fingers.index && fingers.middle && fingers.ring && fingers.pinky;
     }
 
     /**
@@ -134,23 +184,16 @@ export class GestureDetector {
 
         const states = {};
 
-        // Check if each finger is extended
-        // For thumb, use distance from index MCP to account for different orientations
-        const thumbTip = landmarks[tips.thumb];
-        const indexMCP = landmarks[5]; // Index finger MCP joint
-
-        // Thumb is extended if it's far enough from the index MCP
-        const thumbDistance = Math.sqrt(
-            Math.pow(thumbTip.x - indexMCP.x, 2) +
-            Math.pow(thumbTip.y - indexMCP.y, 2)
-        );
+        const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 
         // Use distance between wrist (0) and middle MCP (9) as hand scale
-        const handScale = Math.sqrt(
-            Math.pow(landmarks[0].x - landmarks[9].x, 2) +
-            Math.pow(landmarks[0].y - landmarks[9].y, 2)
-        );
+        const handScale = dist(landmarks[0], landmarks[9]);
 
+        // Check if each finger is extended
+        // For thumb, use distance from index MCP
+        const thumbTip = landmarks[tips.thumb];
+        const indexMCP = landmarks[5];
+        const thumbDistance = dist(thumbTip, indexMCP);
         states.thumb = thumbDistance > handScale * 0.6;
 
         // For other fingers, check vertical distance (y-axis)

@@ -153,43 +153,44 @@ export class EffectRenderer {
         let clipY = 0;
         let clipHeight = 1;
 
-        // Spawn animation - bottom to top reveal
+        // Progressive materialization (PRD 5.1/5.3)
         if (clone.animationState === 'spawning') {
-            const progress = this.easeInOutCubic(clone.animationProgress);
+            const progress = clone.animationProgress;
 
             // Bottom-to-top reveal
             clipY = 1 - progress;
             clipHeight = progress;
 
-            // Scale pop at end
+            // Scale pop at end (PRD 5.1 Frame 61-72)
             if (progress > 0.8) {
                 const popProgress = (progress - 0.8) / 0.2;
-                scale = 0.95 + (0.05 * this.easeOutBack(popProgress));
+                scale = 1.0 + (0.05 * Math.sin(popProgress * Math.PI));
             } else {
-                scale = 0.95;
+                scale = 1.0;
             }
 
-            opacity = Math.min(progress * 1.5, 1);
+            opacity = Math.min(progress * 2, 1);
         }
 
-        // Dismiss animation - top to bottom fade
         if (clone.animationState === 'dismissing') {
-            const progress = this.easeInOutCubic(clone.animationProgress);
+            const progress = clone.animationProgress;
 
-            // Top-to-bottom fade
+            // Top-to-bottom disappear (PRD 5.3)
+            clipY = 0;
             clipHeight = 1 - progress;
             opacity = 1 - progress;
         }
 
         // Apply transformations
-        this.ctx.globalAlpha = opacity * 0.8; // Clones slightly transparent
+        this.ctx.globalAlpha = opacity;
         this.ctx.translate(clone.x, clone.y);
-        this.ctx.scale(scale * 0.5, scale * 0.5); // Make clones smaller (50% of main)
+        this.ctx.scale(scale * 0.6, scale * 0.6); // Clones slightly smaller
 
-        // Create clipping region for reveal effect
         const cloneWidth = this.canvas.width;
         const cloneHeight = this.canvas.height;
 
+        // Use offscreen canvas to apply reveal mask with feathering if possible
+        // For now, stick to clipping for performance, but ensure it matches PRD direction
         this.ctx.beginPath();
         this.ctx.rect(
             -cloneWidth / 2,

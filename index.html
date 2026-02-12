@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Create cinematic clone effects during live recording using hand gestures">
+    <meta name="description" content="Create Naruto-style Shadow Clone effects during live recording using hand seals">
     <meta name="theme-color" content="#1a1a2e">
-    <title>Clone Recorder - Gesture-Controlled Clone Effects</title>
+    <title>Shadow Clone Recorder - Naruto Style Jutsu</title>
 
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -31,7 +31,7 @@
                 </svg>
             </button>
 
-            <h1 class="app-title">Clone Recorder</h1>
+            <h1 class="app-title">Shadow Clone Recorder</h1>
 
             <button id="settingsBtn" class="icon-btn" aria-label="Settings">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -76,12 +76,12 @@
             <!-- Gesture Guide -->
             <div class="gesture-guide">
                 <div class="gesture-item">
-                    <span class="gesture-emoji">✌️</span>
-                    <span class="gesture-text">Spawn</span>
+                    <span class="gesture-emoji">➕</span>
+                    <span class="gesture-text">Hand Seal</span>
                 </div>
                 <div class="gesture-item">
-                    <span class="gesture-emoji">✊</span>
-                    <span class="gesture-text">Dismiss</span>
+                    <span class="gesture-emoji">✋</span>
+                    <span class="gesture-text">Release</span>
                 </div>
                 <div id="cloneCount" class="clone-info">
                     <span>Clones: <strong>0</strong></span>
@@ -121,7 +121,7 @@
     <div id="helpModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>How to Use Clone Recorder</h2>
+                <h2>How to Use Shadow Clone Recorder</h2>
                 <button class="close-btn" data-modal="helpModal">&times;</button>
             </div>
             <div class="modal-body">
@@ -129,7 +129,7 @@
                     <h3>🎬 Getting Started</h3>
                     <ol>
                         <li>Allow camera access when prompted</li>
-                        <li>Use hand gestures to spawn/dismiss clones</li>
+                        <li>Use Naruto hand seals to spawn/dismiss clones</li>
                         <li>Click Record to start capturing</li>
                         <li>Perform your movements with clones</li>
                         <li>Click Stop and download your video</li>
@@ -137,15 +137,15 @@
                 </div>
 
                 <div class="help-section">
-                    <h3>👋 Gestures</h3>
+                    <h3>👋 Hand Seals</h3>
                     <div class="gesture-help">
                         <div>
-                            <strong>✌️ Peace Sign</strong>
-                            <p>Hold for 0.5s to spawn clones</p>
+                            <strong>➕ Shadow Clone Seal</strong>
+                            <p>Cross index and middle fingers to spawn</p>
                         </div>
                         <div>
-                            <strong>✊ Closed Fist</strong>
-                            <p>Hold for 0.5s to dismiss all clones</p>
+                            <strong>✋ Release Seal</strong>
+                            <p>Open palm to dismiss all clones</p>
                         </div>
                     </div>
                 </div>
