@@ -6,6 +6,7 @@ import { CloneManager } from './clone-manager.js';
 import { EffectRenderer } from './video_effects/effect-renderer.js';
 import { VideoRecorder } from './recorder.js';
 import { PerformanceManager } from './performance-manager.js';
+import { SegmentationManager } from './video_effects/segmentation.js';
 
 class CloneRecorderApp {
     constructor() {
@@ -14,6 +15,7 @@ class CloneRecorderApp {
         this.gestureDetector = new GestureDetector();
         this.cloneManager = new CloneManager();
         this.performanceManager = new PerformanceManager();
+        this.segmentationManager = new SegmentationManager();
         this.renderer = null;
         this.recorder = null;
 
@@ -73,8 +75,11 @@ class CloneRecorderApp {
             console.log(`Canvas using camera resolution: ${width}x${height}`);
 
             // Initialize renderer
-            this.renderer = new EffectRenderer(this.elements.canvas, this.elements.video);
+            this.renderer = new EffectRenderer(this.elements.canvas, this.elements.video, this.segmentationManager);
             this.renderer.resize(width, height);
+
+            this.updateLoadingMessage('Initializing segmentation model...');
+            await this.segmentationManager.init(this.elements.video);
 
             // Initialize recorder
             this.recorder = new VideoRecorder(this.elements.canvas);
@@ -110,6 +115,9 @@ class CloneRecorderApp {
             // Apply frame buffer scaling for performance
             this.cloneManager.setFrameBufferScale(perfSettings.frameBufferScale);
 
+            // Enable segmentation if high/medium tier
+            this.cloneManager.setSegmentation(perfSettings.segmentationEnabled);
+
             // Set up event listeners
             this.setupEventListeners();
 
@@ -134,31 +142,6 @@ class CloneRecorderApp {
         }
     }
 
-    /**
-     * Measure performance and apply settings
-     */
-    async measurePerformance() {
-        // Measure performance and get adaptive settings
-        await this.performanceManager.measurePerformance();
-        const perfSettings = this.performanceManager.getSettings();
-
-        // Apply performance-based settings
-        if (this.settings.cloneCountOverride === 0) {
-            this.cloneManager.maxClones = perfSettings.maxClones;
-            console.log(`Clone limit set to ${perfSettings.maxClones} (${this.performanceManager.getTier()} tier)`);
-        } else {
-            this.cloneManager.maxClones = this.settings.cloneCountOverride;
-        }
-
-        // Apply frame buffer scaling for performance
-        this.cloneManager.setFrameBufferScale(perfSettings.frameBufferScale);
-
-        // Enable segmentation if high/medium tier
-        this.cloneManager.setSegmentation(perfSettings.segmentationEnabled);
-
-        this.setupEventListeners();
-        this.startRenderLoop();
-    }
     startRenderLoop() {
         const render = () => {
             this.renderer.render(this.cloneManager);

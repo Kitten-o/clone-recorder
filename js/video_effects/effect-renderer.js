@@ -1,13 +1,20 @@
 // effect-renderer.js - Canvas Rendering and Effects
+import { ParticleSystem } from './particle-system.js';
 
 export class EffectRenderer {
-    constructor(canvas, videoElement) {
+    constructor(canvas, videoElement, segmentationManager) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.videoElement = videoElement;
+        this.segmentationManager = segmentationManager;
+        this.particleSystem = new ParticleSystem();
         this.frameCount = 0;
         this.lastFrameTime = performance.now();
         this.fps = 60;
+
+        // Offscreen canvas for mask processing
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
     }
 
     /**
@@ -16,6 +23,8 @@ export class EffectRenderer {
     resize(width, height) {
         this.canvas.width = width;
         this.canvas.height = height;
+        this.offscreenCanvas.width = width;
+        this.offscreenCanvas.height = height;
         console.log(`Canvas resized to ${width}x${height}`);
     }
 
@@ -27,6 +36,15 @@ export class EffectRenderer {
         const now = performance.now();
         const deltaTime = now - this.lastFrameTime;
         this.lastFrameTime = now;
+
+        // Process segmentation if enabled
+        if (this.segmentationManager) {
+            this.segmentationManager.processFrame(this.videoElement);
+        }
+
+        // Capture clean frame for buffer BEFORE drawing anything
+        // Capture from videoElement instead of canvas to avoid feedback loops
+        cloneManager.addFrame(this.videoElement);
 
         // Update FPS counter
         if (deltaTime > 0) {
@@ -40,6 +58,19 @@ export class EffectRenderer {
         this.ctx.fillStyle = '#0f0f1e';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Update and render particles
+        this.particleSystem.update(deltaTime);
+        const pendingParticles = cloneManager.getParticlePositions();
+        if (pendingParticles.length > 0) {
+            pendingParticles.forEach(p => {
+                this.particleSystem.emit(p.x, p.y, 20, p.type);
+            });
+            if (cloneManager.clearParticlePositions) {
+                cloneManager.clearParticlePositions();
+            }
+        }
+        this.particleSystem.render(this.ctx);
+
         // Draw clones FIRST (behind the user)
         if (cloneManager.hasActiveClones()) {
             this.drawClones(cloneManager);
@@ -47,9 +78,6 @@ export class EffectRenderer {
 
         // Draw main video feed LAST (on top, in front)
         this.drawVideoFullScreen();
-
-        // Capture current frame for buffer AFTER drawing everything
-        cloneManager.addFrame(this.canvas);
 
         this.frameCount++;
     }
@@ -110,6 +138,13 @@ export class EffectRenderer {
         const delayedFrame = cloneManager.getDelayedFrame(clone.delay);
         if (!delayedFrame) return;
 
+        // Apply segmentation mask if enabled
+        let drawSource = delayedFrame;
+        if (cloneManager.useSegmentation && this.segmentationManager) {
+            this.segmentationManager.applyMask(delayedFrame, this.offscreenCanvas);
+            drawSource = this.offscreenCanvas;
+        }
+
         this.ctx.save();
 
         // Calculate animation effects
@@ -166,7 +201,7 @@ export class EffectRenderer {
 
         // Draw delayed frame using drawImage (works with transformations)
         this.ctx.drawImage(
-            delayedFrame,
+            drawSource,
             -cloneWidth / 2,
             -cloneHeight / 2,
             cloneWidth,
@@ -174,9 +209,6 @@ export class EffectRenderer {
         );
 
         this.ctx.restore();
-
-        // TODO: Draw smoke effect (Phase 3)
-        // this.drawSmokeEffect(clone);
     }
 
     /**

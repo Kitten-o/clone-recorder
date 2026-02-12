@@ -270,4 +270,11 @@ export class CloneManager {
     getParticlePositions() {
         return this.particlePositions;
     }
+
+    /**
+     * Clear particle positions after they've been emitted
+     */
+    clearParticlePositions() {
+        this.particlePositions = [];
+    }
 }

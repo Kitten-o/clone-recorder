@@ -3,7 +3,6 @@
 export class GestureDetector {
     constructor() {
         this.hands = null;
-        this.camera = null;
         this.onGestureDetected = null;
         this.confidenceThreshold = 0.8;
         this.holdDuration = 500; // ms
@@ -11,6 +10,7 @@ export class GestureDetector {
         this.lastGestureTime = 0;
         this.currentGestureStart = null;
         this.currentGestureType = null;
+        this.isTracking = false;
     }
 
     /**
@@ -39,17 +39,24 @@ export class GestureDetector {
             // Set up results callback
             this.hands.onResults((results) => this.onResults(results));
 
-            // Initialize camera for gesture detection
-            this.camera = new Camera(videoElement, {
-                onFrame: async () => {
-                    await this.hands.send({ image: videoElement });
-                },
-                width: 320,
-                height: 240
-            });
+            // Manual frame processing loop to avoid camera conflicts
+            const processFrame = async () => {
+                if (!this.isTracking || !this.hands) return;
 
-            // Start processing
-            await this.camera.start();
+                // Only process if video is actually playing and has data
+                if (videoElement.readyState >= 2) {
+                    try {
+                        await this.hands.send({ image: videoElement });
+                    } catch (e) {
+                        console.error('Hands.send error:', e);
+                    }
+                }
+
+                requestAnimationFrame(processFrame);
+            };
+
+            this.isTracking = true;
+            processFrame();
 
             console.log('Gesture detector initialized');
         } catch (error) {
@@ -127,9 +134,24 @@ export class GestureDetector {
 
         const states = {};
 
-        // Check if each finger is extended (tip higher than base)
-        // For thumb, check horizontal distance (x-axis)
-        states.thumb = landmarks[tips.thumb].x > landmarks[bases.thumb].x;
+        // Check if each finger is extended
+        // For thumb, use distance from index MCP to account for different orientations
+        const thumbTip = landmarks[tips.thumb];
+        const indexMCP = landmarks[5]; // Index finger MCP joint
+
+        // Thumb is extended if it's far enough from the index MCP
+        const thumbDistance = Math.sqrt(
+            Math.pow(thumbTip.x - indexMCP.x, 2) +
+            Math.pow(thumbTip.y - indexMCP.y, 2)
+        );
+
+        // Use distance between wrist (0) and middle MCP (9) as hand scale
+        const handScale = Math.sqrt(
+            Math.pow(landmarks[0].x - landmarks[9].x, 2) +
+            Math.pow(landmarks[0].y - landmarks[9].y, 2)
+        );
+
+        states.thumb = thumbDistance > handScale * 0.6;
 
         // For other fingers, check vertical distance (y-axis)
         // Note: y is inverted (0 at top, 1 at bottom)
@@ -210,9 +232,7 @@ export class GestureDetector {
      * Stop gesture detection
      */
     stop() {
-        if (this.camera) {
-            this.camera.stop();
-        }
+        this.isTracking = false;
         if (this.hands) {
             this.hands.close();
         }
